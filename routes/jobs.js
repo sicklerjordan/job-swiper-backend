@@ -3,17 +3,17 @@ const router = express.Router();
 const auth = require('../middleware/auth');
 const Job = require('../models/Job');
 const Interaction = require('../models/Interaction');
-const Match = require('../models/Match'); // <-- Ensure this model exists and is imported
+const Match = require('../models/Match'); // Assuming Match is used here
 
 // @route   POST /api/jobs
 // @desc    Create a new job posting
-// @access  Private (Requires JWT token)
+// @access  Private
 router.post('/', auth, async (req, res) => {
     try {
         const { title, company, location, salary, description } = req.body;
 
         const newJob = new Job({
-            posterId: req.user.id, // User ID comes from the JWT token via auth middleware
+            posterId: req.user.id, 
             title,
             company,
             location,
@@ -32,7 +32,7 @@ router.post('/', auth, async (req, res) => {
 
 
 // @route   GET /api/jobs/feed
-// @desc    Get a feed of jobs to swipe on (excluding own jobs and already interacted jobs)
+// @desc    Get a feed of jobs to swipe on (EXCLUDING interacted and user's own jobs)
 // @access  Private
 router.get('/feed', auth, async (req, res) => {
     try {
@@ -40,27 +40,44 @@ router.get('/feed', auth, async (req, res) => {
 
         // 1. Find all Job IDs the current user has already interacted with
         const interactedJobs = await Interaction.find({ userId: userId }).select('jobId');
-
-        // Extract just the IDs into an array
         const interactedJobIds = interactedJobs.map(interaction => interaction.jobId);
 
         // 2. Build the MongoDB query filter
         const filter = {
-            // Exclude jobs posted by the current user
-            posterId: { $ne: userId }, 
+            // !!! TESTING BYPASS IS ACTIVE HERE !!!
+            // We are deliberately commenting out the filter that prevents you from seeing your own job
+            // posterId: { $ne: userId }, 
             
-            // Exclude jobs the user has already interacted with (in the array of IDs)
+            // Exclude jobs the user has already interacted with
             _id: { $nin: interactedJobIds } 
         };
 
-        // NOTE: If you need to debug and see all jobs, change 'filter' to '{}'
-        let jobs = await Job.find(filter).sort({ createdAt: -1 }); // Sort by newest first
+        let jobs = await Job.find(filter).sort({ createdAt: -1 });
 
         res.json(jobs);
 
     } catch (err) {
         console.error(err.message);
         res.status(500).send('Server Error fetching job feed.');
+    }
+});
+
+
+// @route   GET /api/jobs/mypostings  <-- NEW ROUTE
+// @desc    Get all jobs posted by the currently logged-in user (Job Poster)
+// @access  Private
+router.get('/mypostings', auth, async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        // Find all jobs where the posterId matches the current user's ID
+        const myJobs = await Job.find({ posterId: userId }).sort({ createdAt: -1 });
+
+        res.json(myJobs);
+
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server Error fetching user postings.');
     }
 });
 
@@ -72,16 +89,13 @@ router.get('/accepted', auth, async (req, res) => {
     try {
         const userId = req.user.id;
 
-        // Find all 'accept' interactions by the user
         const acceptedInteractions = await Interaction.find({
             userId: userId,
             interaction: 'accept'
         }).select('jobId');
 
-        // Extract the job IDs
         const acceptedJobIds = acceptedInteractions.map(i => i.jobId);
 
-        // Find the actual Job documents matching those IDs
         const acceptedJobs = await Job.find({ 
             _id: { $in: acceptedJobIds } 
         });
@@ -110,7 +124,6 @@ router.get('/matches/:jobId', auth, async (req, res) => {
             return res.status(404).json({ msg: 'Job not found' });
         }
 
-        // IMPORTANT SECURITY CHECK: Ensure the user requesting the data owns the job
         if (job.posterId.toString() !== userId) {
             return res.status(401).json({ msg: 'Not authorized to view matches for this job' });
         }
@@ -118,7 +131,6 @@ router.get('/matches/:jobId', auth, async (req, res) => {
         // 2. Fetch all candidates (Match records) for this specific jobId
         const candidates = await Match.find({ jobId: jobId });
         
-        // The candidates array contains the candidateProfile embedded in the Match model.
         res.json(candidates);
 
     } catch (err) {
