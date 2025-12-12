@@ -1,81 +1,65 @@
 const express = require('express');
 const router = express.Router();
+const auth = require('../middleware/auth');
 const Interaction = require('../models/Interaction');
-const authMiddleware = require('../middleware/auth');
 
-// @route   POST /api/interactions/swipe
-// @desc    Record a swipe action (left/right/top)
+// @route   POST /api/interactions
+// @desc    Log a user's swipe (accept or reject) on a job
 // @access  Private
-router.post('/swipe', authMiddleware, async (req, res) => {
-    const { jobId, direction } = req.body;
-    const userId = req.user.id;
-
-    if (!jobId || !['left', 'right', 'top'].includes(direction)) {
-        return res.status(400).json({ msg: 'Invalid interaction data' });
-    }
-
+router.post('/', auth, async (req, res) => {
     try {
-        // 1. Check if this interaction already exists (to prevent duplicates)
-        let interaction = await Interaction.findOne({ userId, jobId });
+        const { jobId, interaction } = req.body;
+        const userId = req.user.id; // From the auth middleware
 
-        if (interaction) {
-            // Update the existing interaction if it somehow got recorded twice
-            interaction.direction = direction;
-            await interaction.save();
-            return res.json({ msg: 'Interaction updated', match: false });
+        // 1. Validation (Optional but recommended)
+        if (!['accept', 'reject'].includes(interaction)) {
+            return res.status(400).json({ msg: 'Invalid interaction type.' });
         }
 
-        // 2. Create the new interaction record
-        interaction = new Interaction({
+        // 2. Check if the user has already interacted with this job
+        let existingInteraction = await Interaction.findOne({ userId, jobId });
+
+        if (existingInteraction) {
+            return res.status(400).json({ msg: 'Interaction already recorded for this job.' });
+        }
+
+        // 3. Create and Save New Interaction
+        const newInteraction = new Interaction({
             userId,
             jobId,
-            direction
+            interaction,
+            timestamp: new Date()
         });
 
-        await interaction.save();
-
-        let isMatch = false;
-
-        if (direction === 'right' || direction === 'top') {
-            // For a job app, a 'match' is confirmed when the user likes the job. 
-            // The recruiter (job poster) is notified separately.
-            // For this architecture, we treat a 'right' swipe as a confirmed interest.
-            isMatch = true; 
-        }
-
-        res.json({ 
-            msg: `Swipe recorded: ${direction}`,
-            match: isMatch 
-        });
+        const result = await newInteraction.save();
+        res.status(201).json(result); // Use 201 for resource created
 
     } catch (err) {
         console.error(err.message);
-        res.status(500).send('Server Error recording swipe');
+        res.status(500).send('Server Error logging interaction.');
     }
 });
 
-// @route   GET /api/interactions/matches
-// @desc    Get all jobs the user has swiped right on
+// @route   GET /api/interactions/accepted (for the user's "Applied Jobs" list)
+// @desc    Get all jobs the user has accepted
 // @access  Private
-router.get('/matches', authMiddleware, async (req, res) => {
+router.get('/accepted', auth, async (req, res) => {
     try {
         const userId = req.user.id;
         
-        // Find all 'right' and 'top' swipes
-        const matches = await Interaction.find({
-            userId,
-            direction: { $in: ['right', 'top'] }
-        })
-        // Populate the full Job data from the Job model using the jobId reference
-        .populate('jobId'); 
+        // This is primarily done in the jobs.js route, but can be a dedicated route as well.
+        const acceptedInteractions = await Interaction.find({
+            userId: userId,
+            interaction: 'accept'
+        }).select('jobId');
 
-        // Return only the job information
-        res.json(matches.map(m => m.jobId)); 
+        res.json(acceptedInteractions);
 
     } catch (err) {
         console.error(err.message);
-        res.status(500).send('Server Error fetching matches');
+        res.status(500).send('Server Error fetching accepted interactions.');
     }
 });
+
 
 module.exports = router;
