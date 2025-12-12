@@ -13,12 +13,15 @@ const MatchSchema = new mongoose.Schema({
         ref: 'User',
         required: true
     },
-    // The full profile details of the candidate at the time of acceptance
+    // The profile details of the candidate stored upon 'accept'
     candidateProfile: {
         name: { type: String, required: true },
         email: { type: String, required: true },
-        // Add other fields you want the job poster to see
-        // e.g., resumeUrl: { type: String }
+        // --- FIELDS REMAINING ---
+        bio: { type: String },
+        skills: { type: [String] }
+        // REMOVED: resumeUrl
+        // --- END FIELDS ---
     },
     dateMatched: {
         type: Date,
@@ -26,7 +29,7 @@ const MatchSchema = new mongoose.Schema({
     }
 });
 
-// A job can only be matched with a single candidate once
+// Ensures a user can only interact with a specific job once
 MatchSchema.index({ jobId: 1, candidateId: 1 }, { unique: true });
 
 module.exports = mongoose.model('Match', MatchSchema);

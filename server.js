@@ -1,40 +1,37 @@
-// server.js
-require('dotenv').config(); 
-
 const express = require('express');
-const mongoose = require('mongoose');
+const connectDB = require('./config/db');
+const dotenv = require('dotenv');
 const cors = require('cors');
 
+// Load environment variables from .env file
+dotenv.config();
+
+// Connect to the database
+connectDB();
+
 const app = express();
-const PORT = process.env.PORT || 5000;
 
-// --- MIDDLEWARE ---
-app.use(cors()); 
-app.use(express.json()); 
+// Init Middleware
+app.use(express.json({ extended: false }));
+app.use(cors()); // Enable CORS for frontend connectivity
 
-// --- ROOT ROUTE ---
-app.get('/', (req, res) => {
-    res.send('Job App Backend is running!');
-});
-
-// --- IMPORT ROUTES ---
-// Ensure these files exist in the ./routes folder
+// Define Route Files
 const authRoutes = require('./routes/auth');
 const jobRoutes = require('./routes/jobs');
 const interactionRoutes = require('./routes/interactions');
+const profileRoutes = require('./routes/profile'); // <-- NEW PROFILE ROUTE
 
-// --- USE ROUTES (API Endpoints) ---
+// Basic check route
+app.get('/', (req, res) => res.send('API Running'));
+
+// Define API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/jobs', jobRoutes);
 app.use('/api/interactions', interactionRoutes);
+app.use('/api/profile', profileRoutes); // <-- ADDED PROFILE ROUTE
 
-// --- DB CONNECTION & SERVER START ---
-mongoose.connect(process.env.MONGO_URI)
-    .then(() => {
-        console.log('MongoDB connected successfully.');
-        
-        app.listen(PORT, () => {
-            console.log(`Server listening on port ${PORT}`);
-        });
-    })
-    .catch(err => console.error('DB Connection error:', err));
+// Set the port
+const PORT = process.env.PORT || 5000;
+
+// Start the server
+app.listen(PORT, () => console.log(`Server started on port ${PORT}`));

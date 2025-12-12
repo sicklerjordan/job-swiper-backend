@@ -1,4 +1,4 @@
-const mongoose = require('mongoose'); // <-- THIS IS THE MISSING LINE
+const mongoose = require('mongoose');
 
 const UserSchema = new mongoose.Schema({
     name: {
@@ -14,7 +14,17 @@ const UserSchema = new mongoose.Schema({
         type: String,
         required: true
     },
-    // Add other fields you may have used here (e.g., resume, skills, etc.)
+    // --- PROFILE FIELDS (These are the "resume" contents) ---
+    bio: {
+        type: String,
+        default: 'Tell us a little about your professional background and goals!'
+    },
+    skills: {
+        type: [String], // Array of strings (e.g., ['React', 'Node.js', 'MongoDB'])
+        default: []
+    },
+    // REMOVED: resumeUrl
+    // --- END PROFILE FIELDS ---
     date: {
         type: Date,
         default: Date.now
