@@ -1,4 +1,4 @@
-// job-app-backend/models/User.js
+const mongoose = require('mongoose'); // <-- THIS IS THE MISSING LINE
 
 const UserSchema = new mongoose.Schema({
     name: {
@@ -14,13 +14,11 @@ const UserSchema = new mongoose.Schema({
         type: String,
         required: true
     },
-    // --- ADD THESE FIELDS IF YOU WANT THEM SENT TO THE POSTER ---
-    // Example fields for a profile that is sent upon 'accept'
-    // resume: { type: String, default: null }, 
-    // skills: [{ type: String }],
-    // -----------------------------------------------------------
+    // Add other fields you may have used here (e.g., resume, skills, etc.)
     date: {
         type: Date,
         default: Date.now
     }
 });
+
+module.exports = mongoose.model('User', UserSchema);
