@@ -1,13 +1,26 @@
-const mongoose = require('mongoose');
+// job-app-backend/models/User.js
 
 const UserSchema = new mongoose.Schema({
-    email: { type: String, required: true, unique: true },
-    password: { type: String, required: true }, // Stored as a hash
-    name: { type: String, required: true },
-    headline: String,
-    profilePicture: String,
-    location: String,
-    skills: [String],
+    name: {
+        type: String,
+        required: true
+    },
+    email: {
+        type: String,
+        required: true,
+        unique: true
+    },
+    password: {
+        type: String,
+        required: true
+    },
+    // --- ADD THESE FIELDS IF YOU WANT THEM SENT TO THE POSTER ---
+    // Example fields for a profile that is sent upon 'accept'
+    // resume: { type: String, default: null }, 
+    // skills: [{ type: String }],
+    // -----------------------------------------------------------
+    date: {
+        type: Date,
+        default: Date.now
+    }
 });
-
-module.exports = mongoose.model('User', UserSchema);
