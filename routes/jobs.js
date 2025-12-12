@@ -45,11 +45,6 @@ router.get('/feed', auth, async (req, res) => {
 
         // 2. Build the MongoDB query filter
         const filter = {
-            // Exclude jobs posted by the current user
-            posterId: { $ne: userId }, 
-            
-            // Exclude jobs the user has already interacted with (in the array of IDs)
-            _id: { $nin: interactedJobIds } 
         };
 
         // 3. Fetch the jobs based on the filter
