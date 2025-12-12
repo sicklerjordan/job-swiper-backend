@@ -1,60 +1,100 @@
 const express = require('express');
 const router = express.Router();
+const auth = require('../middleware/auth');
 const Job = require('../models/Job');
 const Interaction = require('../models/Interaction');
-const authMiddleware = require('../middleware/auth');
 
 // @route   POST /api/jobs
-// @desc    Post a new job listing
+// @desc    Create a new job posting
 // @access  Private (Requires JWT token)
-router.post('/', authMiddleware, async (req, res) => {
-    const { title, company, location, salary, description } = req.body;
-    
+router.post('/', auth, async (req, res) => {
     try {
-        // req.user.id is attached by the authMiddleware
+        const { title, company, location, salary, description } = req.body;
+
         const newJob = new Job({
+            posterId: req.user.id, // User ID comes from the JWT token via auth middleware
             title,
             company,
             location,
             salary,
-            description,
-            posterId: req.user.id, 
+            description
         });
 
         const job = await newJob.save();
         res.json(job);
+
     } catch (err) {
         console.error(err.message);
-        res.status(500).send('Server Error during job posting');
+        res.status(500).send('Server Error creating job.');
     }
 });
 
+
 // @route   GET /api/jobs/feed
-// @desc    Get job listings that the user has NOT yet swiped on
+// @desc    Get a feed of jobs to swipe on (excluding own jobs and already interacted jobs)
 // @access  Private
-router.get('/feed', authMiddleware, async (req, res) => {
+router.get('/feed', auth, async (req, res) => {
     try {
         const userId = req.user.id;
 
-        // 1. Find all Job IDs the user has already interacted with
-        const interactions = await Interaction.find({ userId: userId }).select('jobId');
-        const interactedJobIds = interactions.map(interaction => interaction.jobId);
-        
-        // 2. Find jobs that are NOT in the interactedJobIds list
-        // And ensure the user is not seeing their own posted jobs
-        const jobs = await Job.find({
-            _id: { $nin: interactedJobIds }, // Jobs not in the swiped list
-            posterId: { $ne: userId } // Jobs not posted by the current user
-        })
-        .limit(20) // Limit the deck size for performance
-        .sort({ createdAt: -1 }); // Show newest jobs first
+        // 1. Find all Job IDs the current user has already interacted with
+        const interactedJobs = await Interaction.find({ userId: userId }).select('jobId');
+
+        // Extract just the IDs into an array
+        const interactedJobIds = interactedJobs.map(interaction => interaction.jobId);
+
+        // 2. Build the MongoDB query filter
+        const filter = {
+            // Exclude jobs posted by the current user
+            posterId: { $ne: userId }, 
+            
+            // Exclude jobs the user has already interacted with (in the array of IDs)
+            _id: { $nin: interactedJobIds } 
+        };
+
+        // 3. Fetch the jobs based on the filter
+        let jobs = await Job.find(filter).sort({ createdAt: -1 }); // Sort by newest first
+
+        // NOTE: For testing purposes, if you want to see ALL jobs (including your own),
+        // temporarily change the filter line above to: let jobs = await Job.find({});
 
         res.json(jobs);
 
     } catch (err) {
         console.error(err.message);
-        res.status(500).send('Server Error fetching job feed');
+        res.status(500).send('Server Error fetching job feed.');
     }
 });
+
+
+// @route   GET /api/jobs/accepted
+// @desc    Get a list of jobs the user has accepted/applied for
+// @access  Private
+router.get('/accepted', auth, async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        // Find all 'accept' interactions by the user
+        const acceptedInteractions = await Interaction.find({
+            userId: userId,
+            interaction: 'accept'
+        }).select('jobId');
+
+        // Extract the job IDs
+        const acceptedJobIds = acceptedInteractions.map(i => i.jobId);
+
+        // Find the actual Job documents matching those IDs
+        const acceptedJobs = await Job.find({ 
+            _id: { $in: acceptedJobIds } 
+        });
+
+        res.json(acceptedJobs);
+
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server Error fetching accepted jobs.');
+    }
+});
+
 
 module.exports = router;
