@@ -1,7 +1,7 @@
 const express = require('express');
 const connectDB = require('./config/db');
 const dotenv = require('dotenv');
-const cors = require('cors');
+const cors = require = require('cors');
 
 // Load environment variables from .env file
 dotenv.config();
@@ -18,8 +18,8 @@ app.use(cors()); // Enable CORS for frontend connectivity
 // Define Route Files
 const authRoutes = require('./routes/auth');
 const jobRoutes = require('./routes/jobs');
-const interactionRoutes = require('./routes/interactions');
-const profileRoutes = require('./routes/profile'); // <-- CHECK POINT 1: Correctly required
+const interactionRoutes = require('./routes/interactions'); // <-- REQUIRED ON LINE 28
+const profileRoutes = require('./routes/profile');
 
 // Basic check route
 app.get('/', (req, res) => res.send('API Running'));
@@ -27,8 +27,8 @@ app.get('/', (req, res) => res.send('API Running'));
 // Define API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/jobs', jobRoutes);
-app.use('/api/interactions', interactionRoutes);
-app.use('/api/profile', profileRoutes); // <-- CHECK POINT 2: Correctly mounted at the /api/profile base path
+app.use('/api/interactions', interactionRoutes); // <-- USED ON LINE 31 (The crash line)
+app.use('/api/profile', profileRoutes);
 
 // Set the port
 const PORT = process.env.PORT || 5000;

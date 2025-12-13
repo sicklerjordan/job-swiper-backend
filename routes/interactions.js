@@ -1,97 +1,77 @@
 const express = require('express');
-const router = express.Router();
+const router = express = require('router');
 const auth = require('../middleware/auth');
 const Interaction = require('../models/Interaction');
-const User = require('../models/User'); // <-- Need the User model to fetch the candidate profile
-const Match = require('../models/Match'); // <-- The Match model to store accepted candidates
+const Match = require('../models/Match');
+const User = require('../models/User'); 
 
 // @route   POST /api/interactions
-// @desc    Log a user's swipe (accept or reject) on a job AND create a Match record if accepted.
+// @desc    Handle job swiping interaction (accept or reject)
 // @access  Private
 router.post('/', auth, async (req, res) => {
+    const { jobId, interaction } = req.body;
+    const userId = req.user.id; // User ID from the auth token
+
+    // 1. Basic validation
+    if (!jobId || !interaction || (interaction !== 'accept' && interaction !== 'reject')) {
+        return res.status(400).json({ msg: 'Invalid interaction data.' });
+    }
+
     try {
-        const { jobId, interaction } = req.body;
-        const userId = req.user.id; // The ID of the candidate (the swiper)
-
-        // 1. Validation
-        if (!['accept', 'reject'].includes(interaction)) {
-            return res.status(400).json({ msg: 'Invalid interaction type.' });
-        }
-
-        // 2. Check if the user has already interacted with this job
+        // 2. Check if the interaction already exists to prevent duplicates
         let existingInteraction = await Interaction.findOne({ userId, jobId });
 
         if (existingInteraction) {
-            return res.status(400).json({ msg: 'Interaction already recorded for this job.' });
+            return res.status(400).json({ msg: 'Interaction already recorded.' });
         }
 
-        // 3. Create and Save New Interaction
+        // 3. Record the new interaction
         const newInteraction = new Interaction({
             userId,
             jobId,
-            interaction,
-            timestamp: new Date()
+            interaction
         });
+
         await newInteraction.save();
 
-        // 4. Match Creation Logic (ONLY if the swipe was 'accept')
+        // 4. Handle Match creation if interaction is 'accept'
         if (interaction === 'accept') {
             
-            // 4.1. Get the candidate's profile (select only the fields the job poster needs)
-            const candidate = await User.findById(userId).select('name email'); 
+            // 4.1. Get the current user's (candidate) profile data to store in the Match
+            const candidate = await User.findById(userId).select('name email bio skills'); 
             
             if (!candidate) {
-                // This shouldn't happen if auth passed, but good for safety
                 return res.status(404).json({ msg: 'Candidate profile not found.' });
             }
 
             // 4.2. Create the Match record
+            // Note: Since the job is considered a 'match' as soon as the candidate accepts, 
+            // we create the Match record now. 
             const newMatch = new Match({
-                jobId: jobId,
                 candidateId: userId,
+                jobId: jobId,
+                // Store candidate data directly in the match record for persistence
                 candidateProfile: {
-                    // Copy required profile details into the embedded object
                     name: candidate.name,
-                    email: candidate.email
-                    // Add other profile fields here if they exist on the User model
+                    email: candidate.email,
+                    bio: candidate.bio,
+                    skills: candidate.skills
                 }
             });
 
             await newMatch.save();
+            return res.json({ msg: 'Interaction recorded and Match created!', match: newMatch });
         }
         
-        // Final response
-        res.status(201).json({ msg: 'Interaction and match logged successfully.' });
+        // Response for a reject interaction
+        res.json({ msg: 'Interaction recorded (Rejected).' });
 
     } catch (err) {
-        console.error(err.message);
-        // Check for specific Mongoose error if Match creation failed (e.g., duplicate index)
-        if (err.code === 11000) {
-            return res.status(400).json({ msg: 'Duplicate key error during match creation.' });
-        }
-        res.status(500).send('Server Error logging interaction and match.');
-    }
-});
-
-// @route   GET /api/interactions/accepted 
-// @desc    (Optional) Get accepted interactions for the user's dashboard view
-// @access  Private
-router.get('/accepted', auth, async (req, res) => {
-    try {
-        const userId = req.user.id;
-        
-        const acceptedInteractions = await Interaction.find({
-            userId: userId,
-            interaction: 'accept'
-        }).select('jobId');
-
-        res.json(acceptedInteractions);
-
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Server Error fetching accepted interactions.');
+        console.error('Error handling interaction:', err.message);
+        res.status(500).send('Server Error during interaction processing');
     }
 });
 
 
+// CRITICAL: Must export the router
 module.exports = router;
