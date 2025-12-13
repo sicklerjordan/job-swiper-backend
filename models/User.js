@@ -14,21 +14,19 @@ const UserSchema = new mongoose.Schema({
         type: String,
         required: true
     },
-    // --- PROFILE FIELDS (These are the "resume" contents) ---
+    // Profile Fields (Initialize as empty)
     bio: {
         type: String,
-        default: 'Tell us a little about your professional background and goals!'
+        default: ''
     },
     skills: {
-        type: [String], // Array of strings (e.g., ['React', 'Node.js', 'MongoDB'])
+        type: [String], // Array of strings
         default: []
     },
-    // REMOVED: resumeUrl
-    // --- END PROFILE FIELDS ---
     date: {
         type: Date,
         default: Date.now
     }
 });
 
-module.exports = mongoose.model('User', UserSchema);
+module.exports = User = mongoose.model('user', UserSchema);

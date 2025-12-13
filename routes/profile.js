@@ -1,26 +1,28 @@
 const express = require('express');
 const router = express.Router();
-const auth = require('../middleware/auth');
+const auth = require('../middleware/auth'); // Required for token check
 const User = require('../models/User'); 
 
 // @route   GET /api/profile/me
-// @desc    Get current user's profile data
+// @desc    Get current user's profile data (for the profile tab)
 // @access  Private
 router.get('/me', auth, async (req, res) => {
     try {
-        // req.user.id MUST be set by the auth middleware
+        // req.user.id is set by the auth middleware
         const profile = await User.findById(req.user.id).select('-password -date');
 
         if (!profile) {
-            console.error(`Profile not found for user ID: ${req.user.id}`);
             return res.status(404).json({ msg: 'Profile not found' });
         }
 
-        res.json(profile);
+        // Returns { _id, name, email, bio, skills }
+        res.json(profile); 
     } catch (err) {
-        console.error('Error fetching profile in /api/profile/me:', err.message);
-        res.status(500).send('Server Error fetching profile.');
+        console.error('Error fetching profile:', err.message);
+        res.status(500).send('Server Error');
     }
 });
 
-// ... (rest of the profile.js file for POST /api/profile)
+// ... (You should also have the POST /api/profile route here, but focusing on GET)
+
+module.exports = router;
